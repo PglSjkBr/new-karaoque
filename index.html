@@ -969,20 +969,21 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
         <div id="qr-box" class="palco-qr-box" style="width: 260px; padding: 1rem;">
           <img 
             id="qr-img" 
-            src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https%3A%2F%2Fpglsjkbr.github.io%2Fnew-karaoque%2F%3Fmodo%3Dcontrole" 
+            src="qr.png" 
             alt="QR Code da festa" 
             width="200" 
             height="200" 
             style="display: block; border-radius: 6px; object-fit: contain; width: 200px; height: 200px; margin: 0 auto;" 
-            onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://quickchart.io/qr?size=300&text=https%3A%2F%2Fpglsjkbr.github.io%2Fnew-karaoque%2F%3Fmodo%3Dcontrole';}else{var b=document.getElementById('qr-box');if(b)b.style.display='none';}"
+            onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https%3A%2F%2Fpglsjkbr.github.io%2Fnew-karaoque%2F%3Fmodo%3Dcontrole';}else{var b=document.getElementById('qr-box');if(b)b.style.display='none';}"
           >
           <div class="palco-qr-label" style="font-size: 0.95rem; margin-top: 0.5rem;">📱 Escaneie para entrar na festa</div>
 
-          <!-- Alternativa sem QR: Endereço visível e botão de cópia -->
+          <!-- Alternativa sem QR: Endereço visível, cópia e envio por WhatsApp -->
           <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); width: 100%;">
             <div style="font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 0.25rem;">Ou digite no celular:</div>
             <div id="palco-direct-url" style="font-size: 1.05rem; font-weight: 800; color: var(--navy); word-break: break-all; background: #FFFDF5; padding: 0.4rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--gold); user-select: all;">pglsjkbr.github.io/new-karaoque/?modo=controle</div>
             <button type="button" class="btn-outline btn-sm" id="btn-copy-invite-link" style="margin-top: 0.6rem; width: 100%; font-size: 0.88rem; font-weight: 700; cursor: pointer;">📋 Copiar link do convite</button>
+            <button type="button" class="btn-gold" id="btn-whatsapp-invite" style="margin-top: 0.6rem; width: 100%; font-size: 0.92rem; font-weight: 700; padding: 0.6rem 0.8rem; cursor: pointer;">📲 Enviar convite pelo WhatsApp</button>
             <input type="text" id="manual-copy-input" readonly value="https://pglsjkbr.github.io/new-karaoque/?modo=controle" style="display: none; width: 100%; margin-top: 0.5rem; font-size: 0.85rem; padding: 0.4rem; border: 1px solid var(--navy); border-radius: var(--radius-sm); text-align: center;" onclick="this.select();">
           </div>
         </div>
@@ -2167,10 +2168,6 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
         if (location.href && location.href.indexOf('http') === 0) {
           var realBase = location.href.split('?')[0].split('#')[0];
           var realTarget = realBase + '?modo=controle';
-          var qrImg = document.getElementById('qr-img');
-          if (qrImg) {
-            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(realTarget);
-          }
           var directUrlEl = document.getElementById('palco-direct-url');
           if (directUrlEl) {
             directUrlEl.textContent = realTarget.replace(/^https?:\/\//, '');
@@ -3790,6 +3787,20 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
         }
       } catch (eCopy) {
         console.warn('Erro ao configurar botão de copiar convite:', eCopy);
+      }
+
+      // Botão Enviar Convite pelo WhatsApp
+      try {
+        var btnWhatsapp = document.getElementById('btn-whatsapp-invite');
+        if (btnWhatsapp) {
+          btnWhatsapp.addEventListener('click', function() {
+            var msg = "🎤✝️ Entre na festa do New Karaoquê! Escolha sua música pelo celular: https://pglsjkbr.github.io/new-karaoque/?modo=controle";
+            var url = "https://wa.me/?text=" + encodeURIComponent(msg);
+            window.open(url, '_blank');
+          });
+        }
+      } catch (eWa) {
+        console.warn('Erro ao configurar botão de convite pelo WhatsApp:', eWa);
       }
 
       // Controles do Palco (TV)
