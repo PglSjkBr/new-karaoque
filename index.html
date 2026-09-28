@@ -965,10 +965,26 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
           </div>
         </div>
 
-        <!-- Quadro branco com borda dourada ~220px para o QR Code -->
-        <div id="qr-box" class="palco-qr-box" style="width: 220px;">
-          <img id="qr-img" alt="QR Code da festa" width="180" height="180" style="display: block; border-radius: 4px; object-fit: contain;" onerror="var b = document.getElementById('qr-box'); if (b) b.style.display = 'none';">
-          <div class="palco-qr-label">📱 Escaneie para entrar na festa</div>
+        <!-- Quadro branco com borda dourada para o QR Code e Alternativa sem QR -->
+        <div id="qr-box" class="palco-qr-box" style="width: 260px; padding: 1rem;">
+          <img 
+            id="qr-img" 
+            src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https%3A%2F%2Fpglsjkbr.github.io%2Fnew-karaoque%2F%3Fmodo%3Dcontrole" 
+            alt="QR Code da festa" 
+            width="200" 
+            height="200" 
+            style="display: block; border-radius: 6px; object-fit: contain; width: 200px; height: 200px; margin: 0 auto;" 
+            onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://quickchart.io/qr?size=300&text=https%3A%2F%2Fpglsjkbr.github.io%2Fnew-karaoque%2F%3Fmodo%3Dcontrole';}else{var b=document.getElementById('qr-box');if(b)b.style.display='none';}"
+          >
+          <div class="palco-qr-label" style="font-size: 0.95rem; margin-top: 0.5rem;">📱 Escaneie para entrar na festa</div>
+
+          <!-- Alternativa sem QR: Endereço visível e botão de cópia -->
+          <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); width: 100%;">
+            <div style="font-size: 1rem; font-weight: 700; color: var(--navy); margin-bottom: 0.25rem;">Ou digite no celular:</div>
+            <div id="palco-direct-url" style="font-size: 1.05rem; font-weight: 800; color: var(--navy); word-break: break-all; background: #FFFDF5; padding: 0.4rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--gold); user-select: all;">pglsjkbr.github.io/new-karaoque/?modo=controle</div>
+            <button type="button" class="btn-outline btn-sm" id="btn-copy-invite-link" style="margin-top: 0.6rem; width: 100%; font-size: 0.88rem; font-weight: 700; cursor: pointer;">📋 Copiar link do convite</button>
+            <input type="text" id="manual-copy-input" readonly value="https://pglsjkbr.github.io/new-karaoque/?modo=controle" style="display: none; width: 100%; margin-top: 0.5rem; font-size: 0.85rem; padding: 0.4rem; border: 1px solid var(--navy); border-radius: var(--radius-sm); text-align: center;" onclick="this.select();">
+          </div>
         </div>
       </div>
 
@@ -1232,9 +1248,865 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
           renderRanking();
         }
 
-        // Se abrir o palco, renderiza/atualiza o QR Code
+    // ENTRADA DIRETA PELO PARÂMETRO (?modo=controle)
+    // ==========================================
+    try {
+      var urlSearch = window.location.search || '';
+      if (urlSearch.indexOf('modo=controle') !== -1) {
+        showScreen('controle');
+      }
+    } catch (eParam) {
+      console.warn('Erro ao processar parâmetro de URL:', eParam);
+    }
+
+    // Helper toast simples
+    function showToast(msg) {
+      try {
+        var toast = document.getElementById('app-toast');
+        if (toast) {
+          toast.textContent = msg;
+          toast.style.display = 'block';
+          setTimeout(function() {
+            toast.style.display = 'none';
+          }, 3000);
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+=======
+    // Fallback de imagens com falha
+    function setupImageFallbacks() {
+      try {
+        var imgs = document.querySelectorAll('img.mascot-avatar');
+        imgs.forEach(function(img) {
+          img.onerror = function() {
+            this.onerror = null;
+            this.src = "https://img.usecurling.com/i?q=music-note&color=yellow&shape=fill";
+          };
+        });
+      } catch (e) {
+        console.warn('Erro ao configurar fallbacks:', e);
+      }
+    }
+
+    // ==========================================
+    // GERADOR EMBUTIDO DE QR CODE (PURO JS, INDEPENDENTE)
+    // ==========================================
+    var MiniQR = (function() {
+      try {
+        var EXP = new Array(256), LOG = new Array(256);
+        for (var i = 0; i < 8; i++) EXP[i] = 1 << i;
+        for (var i = 8; i < 256; i++) EXP[i] = EXP[i - 4] ^ EXP[i - 5] ^ EXP[i - 6] ^ EXP[i - 8];
+        for (var i = 0; i < 255; i++) LOG[EXP[i]] = i;
+
+        function glog(n) { if (n < 1) throw new Error("glog"); return LOG[n]; }
+        function gexp(n) { while (n < 0) n += 255; while (n >= 256) n -= 255; return EXP[n]; }
+
+        function Poly(num, shift) {
+          var offset = 0;
+          while (offset < num.length && num[offset] === 0) offset++;
+          this.num = new Array(num.length - offset + shift);
+          for (var i = 0; i < num.length - offset; i++) this.num[i] = num[i + offset];
+          for (var i = 0; i < shift; i++) this.num[this.num.length - shift + i] = 0;
+        }
+        Poly.prototype = {
+          get: function(index) { return this.num[index]; },
+          getLength: function() { return this.num.length; },
+          multiply: function(e) {
+            var num = new Array(this.getLength() + e.getLength() - 1);
+            for (var i = 0; i < num.length; i++) num[i] = 0;
+            for (var i = 0; i < this.getLength(); i++) {
+              for (var j = 0; j < e.getLength(); j++) {
+                num[i + j] ^= gexp(glog(this.get(i)) + glog(e.get(j)));
+              }
+            }
+            return new Poly(num, 0);
+          },
+          mod: function(e) {
+            if (this.getLength() - e.getLength() < 0) return this;
+            var ratio = glog(this.get(0)) - glog(e.get(0));
+            var num = new Array(this.getLength());
+            for (var i = 0; i < this.getLength(); i++) num[i] = this.get(i);
+            for (var i = 0; i < e.getLength(); i++) num[i] ^= gexp(glog(e.get(i)) + ratio);
+            return new Poly(num, 0).mod(e);
+          }
+        };
+
+        function getErrorCorrectPolynomial(errorCorrectLength) {
+          var a = new Poly([1], 0);
+          for (var i = 0; i < errorCorrectLength; i++) {
+            a = a.multiply(new Poly([1, gexp(i)], 0));
+          }
+          return a;
+        }
+
+        // [blockCount, totalCodewords, dataCodewords] Ver 1..7 ECC Level L
+        var RS_BLOCK_TABLE = [
+          [1, 26, 19],
+          [1, 44, 34],
+          [1, 70, 55],
+          [1, 100, 80],
+          [1, 134, 108],
+          [2, 86, 68],
+          [2, 98, 78]
+        ];
+
+        var ALIGN_PATTERNS = [
+          [],
+          [6, 18],
+          [6, 22],
+          [6, 26],
+          [6, 30],
+          [6, 34],
+          [6, 22, 38]
+        ];
+
+        function BitBuffer() {
+          this.buffer = [];
+          this.length = 0;
+        }
+        BitBuffer.prototype = {
+          put: function(num, length) {
+            for (var i = 0; i < length; i++) {
+              this.putBit(((num >>> (length - i - 1)) & 1) === 1);
+            }
+          },
+          putBit: function(bit) {
+            var bufIndex = Math.floor(this.length / 8);
+            if (this.buffer.length <= bufIndex) this.buffer.push(0);
+            if (bit) this.buffer[bufIndex] |= (0x80 >>> (this.length % 8));
+            this.length++;
+          }
+        };
+
+        function createData(typeNumber, text) {
+          var rsBlock = RS_BLOCK_TABLE[typeNumber - 1];
+          var totalDataCount = rsBlock[0] * rsBlock[2];
+
+          var buffer = new BitBuffer();
+          buffer.put(4, 4); // Byte mode
+
+          var strBytes = [];
+          for (var i = 0; i < text.length; i++) {
+            var c = text.charCodeAt(i);
+            if (c < 128) {
+              strBytes.push(c);
+            } else if (c < 2048) {
+              strBytes.push(192 | (c >> 6), 128 | (c & 63));
+            } else {
+              strBytes.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63));
+            }
+          }
+          buffer.put(strBytes.length, typeNumber < 10 ? 8 : 16);
+          for (var i = 0; i < strBytes.length; i++) {
+            buffer.put(strBytes[i], 8);
+          }
+
+          if (buffer.length + 4 <= totalDataCount * 8) {
+            buffer.put(0, 4);
+          }
+          while (buffer.length % 8 !== 0) {
+            buffer.putBit(false);
+          }
+          while (buffer.length < totalDataCount * 8) {
+            buffer.put(0xec, 8);
+            if (buffer.length >= totalDataCount * 8) break;
+            buffer.put(0x11, 8);
+          }
+
+          var blockCount = rsBlock[0];
+          var dataCount = rsBlock[2];
+          var totalCount = rsBlock[1];
+          var ecCount = totalCount - dataCount;
+
+          var rsPoly = getErrorCorrectPolynomial(ecCount);
+          var rawData = buffer.buffer;
+
+          var dcData = [];
+          var ecData = [];
+
+          for (var r = 0; r < blockCount; r++) {
+            var dc = [];
+            for (var i = 0; i < dataCount; i++) {
+              dc.push(rawData[r * dataCount + i] || 0);
+            }
+            dcData.push(dc);
+
+            var modPoly = new Poly(dc, ecCount).mod(rsPoly);
+            var ec = new Array(ecCount);
+            for (var i = 0; i < ecCount; i++) {
+              var modIndex = i + modPoly.getLength() - ecCount;
+              ec[i] = (modIndex >= 0) ? modPoly.get(modIndex) : 0;
+            }
+            ecData.push(ec);
+          }
+
+          var totalCode = [];
+          for (var i = 0; i < dataCount; i++) {
+            for (var r = 0; r < blockCount; r++) {
+              totalCode.push(dcData[r][i]);
+            }
+          }
+          for (var i = 0; i < ecCount; i++) {
+            for (var r = 0; r < blockCount; r++) {
+              totalCode.push(ecData[r][i]);
+            }
+          }
+          return totalCode;
+        }
+
+        var FORMAT_INFO_MASK0 = 0x77c4;
+
+        function generateMatrix(text) {
+          var byteLen = text.length;
+          var ver = 1;
+          for (var v = 1; v <= RS_BLOCK_TABLE.length; v++) {
+            var cap = (RS_BLOCK_TABLE[v - 1][0] * RS_BLOCK_TABLE[v - 1][2]) - 3;
+            if (byteLen <= cap) {
+              ver = v;
+              break;
+            }
+          }
+          var modCount = ver * 4 + 17;
+          var modules = [];
+          var isFunction = [];
+          for (var r = 0; r < modCount; r++) {
+            modules[r] = new Array(modCount);
+            isFunction[r] = new Array(modCount);
+            for (var c = 0; c < modCount; c++) {
+              modules[r][c] = false;
+              isFunction[r][c] = false;
+            }
+          }
+
+          function setupPositionProbe(row, col) {
+            for (var r = -1; r <= 7; r++) {
+              var cr = row + r;
+              if (cr < 0 || cr >= modCount) continue;
+              for (var c = -1; c <= 7; c++) {
+                var cc = col + c;
+                if (cc < 0 || cc >= modCount) continue;
+                if ((0 <= r && r <= 6 && (c === 0 || c === 6)) ||
+                    (0 <= c && c <= 6 && (r === 0 || r === 6)) ||
+                    (2 <= r && r <= 4 && 2 <= c && c <= 4)) {
+                  modules[cr][cc] = true;
+                } else {
+                  modules[cr][cc] = false;
+                }
+                isFunction[cr][cc] = true;
+              }
+            }
+          }
+
+          setupPositionProbe(0, 0);
+          setupPositionProbe(modCount - 7, 0);
+          setupPositionProbe(0, modCount - 7);
+
+          for (var i = 8; i < modCount - 8; i++) {
+            if (!isFunction[i][6]) {
+              modules[i][6] = (i % 2 === 0);
+              isFunction[i][6] = true;
+            }
+            if (!isFunction[6][i]) {
+              modules[6][i] = (i % 2 === 0);
+              isFunction[6][i] = true;
+            }
+          }
+
+          var pos = ALIGN_PATTERNS[ver - 1];
+          for (var i = 0; i < pos.length; i++) {
+            for (var j = 0; j < pos.length; j++) {
+              var row = pos[i];
+              var col = pos[j];
+              if (isFunction[row][col]) continue;
+              for (var r = -2; r <= 2; r++) {
+                for (var c = -2; c <= 2; c++) {
+                  modules[row + r][col + c] = (r === -2 || r === 2 || c === -2 || c === 2 || (r === 0 && c === 0));
+                  isFunction[row + r][col + c] = true;
+                }
+              }
+            }
+          }
+
+          var pos1 = [
+            [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8],
+            [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]
+          ];
+          var pos2 = [
+            [8, modCount - 1], [8, modCount - 2], [8, modCount - 3], [8, modCount - 4],
+            [8, modCount - 5], [8, modCount - 6], [8, modCount - 7], [8, modCount - 8],
+            [modCount - 7, 8], [modCount - 6, 8], [modCount - 5, 8], [modCount - 4, 8],
+            [modCount - 3, 8], [modCount - 2, 8], [modCount - 1, 8]
+          ];
+
+          for (var i = 0; i < 15; i++) {
+            isFunction[pos1[i][0]][pos1[i][1]] = true;
+            isFunction[pos2[i][0]][pos2[i][1]] = true;
+          }
+
+          modules[4 * ver + 9][8] = true;
+          isFunction[4 * ver + 9][8] = true;
+
+          var data = createData(ver, text);
+          var bitIndex = 0;
+          var byteIndex = 0;
+          var inc = -1;
+          var row = modCount - 1;
+
+          for (var col = modCount - 1; col > 0; col -= 2) {
+            if (col === 6) col--;
+            while (true) {
+              for (var c = 0; c < 2; c++) {
+                var colIdx = col - c;
+                if (!isFunction[row][colIdx]) {
+                  var dark = false;
+                  if (byteIndex < data.length) {
+                    dark = (((data[byteIndex] >>> (7 - bitIndex)) & 1) === 1);
+                  }
+                  var mask = ((row + colIdx) % 2 === 0);
+                  modules[row][colIdx] = dark ^ mask;
+                  bitIndex++;
+                  if (bitIndex === 8) {
+                    bitIndex = 0;
+                    byteIndex++;
+                  }
+                }
+              }
+              row += inc;
+              if (row < 0 || modCount <= row) {
+                row -= inc;
+                inc = -inc;
+                break;
+              }
+            }
+          }
+
+          var formatBits = FORMAT_INFO_MASK0;
+          for (var i = 0; i < 15; i++) {
+            var bit = ((formatBits >>> i) & 1) === 1;
+            modules[pos1[i][0]][pos1[i][1]] = bit;
+            modules[pos2[i][0]][pos2[i][1]] = bit;
+          }
+
+          return { size: modCount, modules: modules };
+        }
+
+        function toSVG(text, size) {
+          var qr = generateMatrix(text);
+          var modCount = qr.size;
+          var margin = 2;
+          var totalCells = modCount + margin * 2;
+          var cellSize = size / totalCells;
+          var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '" style="display:block;margin:0 auto;border-radius:4px;" aria-label="QR Code para entrar no modo controle">';
+          svg += '<rect width="' + size + '" height="' + size + '" fill="#FFFFFF"/>';
+          for (var r = 0; r < modCount; r++) {
+            for (var c = 0; c < modCount; c++) {
+              if (qr.modules[r][c]) {
+                var x = (c + margin) * cellSize;
+                var y = (r + margin) * cellSize;
+                svg += '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + (cellSize + 0.05).toFixed(2) + '" height="' + (cellSize + 0.05).toFixed(2) + '" fill="#1A365D"/>';
+              }
+            }
+          }
+          svg += '</svg>';
+          return svg;
+        }
+
+        return { toSVG: toSVG };
+      } catch (e) {
+        console.warn('MiniQR initialization failed:', e);
+        return null;
+      }
+    })();
+
+    // Helper com isolamento estrito para renderizar o QR code do palco
+    var lastPalcoQrUrl = "";
+    function renderPalcoQR() {
+      try {
+        var card = document.getElementById('palco-qr-card');
+        var renderEl = document.getElementById('palco-qr-render');
+        if (!card || !renderEl) return;
+
+        var base = (window.location.href || '').split('?')[0].split('#')[0];
+        var targetUrl = base + '?modo=controle';
+
+        // Evita reprocessamento se URL idêntica e já renderizado
+        if (targetUrl === lastPalcoQrUrl && renderEl.hasChildNodes()) {
+          return;
+        }
+        lastPalcoQrUrl = targetUrl;
+
+        if (MiniQR && typeof MiniQR.toSVG === 'function') {
+          var svgHtml = MiniQR.toSVG(targetUrl, 170);
+          if (svgHtml) {
+            renderEl.innerHTML = svgHtml;
+            card.style.display = 'flex';
+            return;
+          }
+        }
+        // Se algo falhar dentro da geração, oculta o card com segurança
+        card.style.display = 'none';
+      } catch (err) {
+        console.warn('Falha segura na renderização do QR Code:', err);
+        try {
+          var c = document.getElementById('palco-qr-card');
+          if (c) c.style.display = 'none';
+        } catch(e) {}
+      }
+    }
+
+    // ==========================================
+    // 2. CATÁLOGO INICIAL COM 50 LOUVORES
+    // ====================================================================================
+    // 2. CATÁLOGO INICIAL COM 50 LOUVORES
+    // ==========================================
+    var DEFAULT_CATALOG = [
+=======
+    // Fallback de imagens com falha
+    function setupImageFallbacks() {
+      try {
+        var imgs = document.querySelectorAll('img.mascot-avatar');
+        imgs.forEach(function(img) {
+          img.onerror = function() {
+            this.onerror = null;
+            this.src = "https://img.usecurling.com/i?q=music-note&color=yellow&shape=fill";
+          };
+        });
+      } catch (e) {
+        console.warn('Erro ao configurar fallbacks:', e);
+      }
+    }
+
+    // ==========================================
+    // QR CODE VIA API PÚBLICA (api.qrserver.com)
+    // ==========================================
+    function initQRCode() {
+      try {
+        var qrBox = document.getElementById('qr-box');
+        var qrImg = document.getElementById('qr-img');
+        if (!qrBox || !qrImg) return;
+
+        var url = location.href.split('?')[0].split('#')[0] + '?modo=controle';
+
+        // Se a URL não começar com "http" (arquivo aberto localmente), esconder o container do QR
+        if (!url.startsWith('http')) {
+          qrBox.style.display = 'none';
+          return;
+        }
+
+        qrImg.onerror = function() {
+          if (qrBox) qrBox.style.display = 'none';
+        };
+
+        var src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(url);
+        qrImg.src = src;
+      } catch (eQr) {
+        console.warn('Erro ao carregar QR Code:', eQr);
+        try {
+          var b = document.getElementById('qr-box');
+          if (b) b.style.display = 'none';
+        } catch (_) {}
+      }
+    }
+
+    // ==========================================
+    // 2. CATÁLOGO INICIAL COM 50 LOUVORES
+    // ==========================================
+    var DEFAULT_CATALOG = [==========================================
+=======
+    // Fallback de imagens com falha
+    function setupImageFallbacks() {
+      try {
+        var imgs = document.querySelectorAll('img.mascot-avatar');
+        imgs.forEach(function(img) {
+          img.onerror = function() {
+            this.onerror = null;
+            this.src = "https://img.usecurling.com/i?q=music-note&color=yellow&shape=fill";
+          };
+        });
+      } catch (e) {
+        console.warn('Erro ao configurar fallbacks:', e);
+      }
+    }
+
+    // ==========================================
+    // GERADOR EMBUTIDO DE QR CODE (PURO JS, INDEPENDENTE)
+    // ==========================================
+    var MiniQR = (function() {
+      try {
+        var EXP = new Array(256), LOG = new Array(256);
+        for (var i = 0; i < 8; i++) EXP[i] = 1 << i;
+        for (var i = 8; i < 256; i++) EXP[i] = EXP[i - 4] ^ EXP[i - 5] ^ EXP[i - 6] ^ EXP[i - 8];
+        for (var i = 0; i < 255; i++) LOG[EXP[i]] = i;
+
+        function glog(n) { if (n < 1) throw new Error("glog"); return LOG[n]; }
+        function gexp(n) { while (n < 0) n += 255; while (n >= 256) n -= 255; return EXP[n]; }
+
+        function Poly(num, shift) {
+          var offset = 0;
+          while (offset < num.length && num[offset] === 0) offset++;
+          this.num = new Array(num.length - offset + shift);
+          for (var i = 0; i < num.length - offset; i++) this.num[i] = num[i + offset];
+          for (var i = 0; i < shift; i++) this.num[this.num.length - shift + i] = 0;
+        }
+        Poly.prototype = {
+          get: function(index) { return this.num[index]; },
+          getLength: function() { return this.num.length; },
+          multiply: function(e) {
+            var num = new Array(this.getLength() + e.getLength() - 1);
+            for (var i = 0; i < num.length; i++) num[i] = 0;
+            for (var i = 0; i < this.getLength(); i++) {
+              for (var j = 0; j < e.getLength(); j++) {
+                num[i + j] ^= gexp(glog(this.get(i)) + glog(e.get(j)));
+              }
+            }
+            return new Poly(num, 0);
+          },
+          mod: function(e) {
+            if (this.getLength() - e.getLength() < 0) return this;
+            var ratio = glog(this.get(0)) - glog(e.get(0));
+            var num = new Array(this.getLength());
+            for (var i = 0; i < this.getLength(); i++) num[i] = this.get(i);
+            for (var i = 0; i < e.getLength(); i++) num[i] ^= gexp(glog(e.get(i)) + ratio);
+            return new Poly(num, 0).mod(e);
+          }
+        };
+
+        function getErrorCorrectPolynomial(errorCorrectLength) {
+          var a = new Poly([1], 0);
+          for (var i = 0; i < errorCorrectLength; i++) {
+            a = a.multiply(new Poly([1, gexp(i)], 0));
+          }
+          return a;
+        }
+
+        // [blockCount, totalCodewords, dataCodewords] Ver 1..7 ECC Level L
+        var RS_BLOCK_TABLE = [
+          [1, 26, 19],
+          [1, 44, 34],
+          [1, 70, 55],
+          [1, 100, 80],
+          [1, 134, 108],
+          [2, 86, 68],
+          [2, 98, 78]
+        ];
+
+        var ALIGN_PATTERNS = [
+          [],
+          [6, 18],
+          [6, 22],
+          [6, 26],
+          [6, 30],
+          [6, 34],
+          [6, 22, 38]
+        ];
+
+        function BitBuffer() {
+          this.buffer = [];
+          this.length = 0;
+        }
+        BitBuffer.prototype = {
+          put: function(num, length) {
+            for (var i = 0; i < length; i++) {
+              this.putBit(((num >>> (length - i - 1)) & 1) === 1);
+            }
+          },
+          putBit: function(bit) {
+            var bufIndex = Math.floor(this.length / 8);
+            if (this.buffer.length <= bufIndex) this.buffer.push(0);
+            if (bit) this.buffer[bufIndex] |= (0x80 >>> (this.length % 8));
+            this.length++;
+          }
+        };
+
+        function createData(typeNumber, text) {
+          var rsBlock = RS_BLOCK_TABLE[typeNumber - 1];
+          var totalDataCount = rsBlock[0] * rsBlock[2];
+
+          var buffer = new BitBuffer();
+          buffer.put(4, 4); // Byte mode
+
+          var strBytes = [];
+          for (var i = 0; i < text.length; i++) {
+            var c = text.charCodeAt(i);
+            if (c < 128) {
+              strBytes.push(c);
+            } else if (c < 2048) {
+              strBytes.push(192 | (c >> 6), 128 | (c & 63));
+            } else {
+              strBytes.push(224 | (c >> 12), 128 | ((c >> 6) & 63), 128 | (c & 63));
+            }
+          }
+          buffer.put(strBytes.length, typeNumber < 10 ? 8 : 16);
+          for (var i = 0; i < strBytes.length; i++) {
+            buffer.put(strBytes[i], 8);
+          }
+
+          if (buffer.length + 4 <= totalDataCount * 8) {
+            buffer.put(0, 4);
+          }
+          while (buffer.length % 8 !== 0) {
+            buffer.putBit(false);
+          }
+          while (buffer.length < totalDataCount * 8) {
+            buffer.put(0xec, 8);
+            if (buffer.length >= totalDataCount * 8) break;
+            buffer.put(0x11, 8);
+          }
+
+          var blockCount = rsBlock[0];
+          var dataCount = rsBlock[2];
+          var totalCount = rsBlock[1];
+          var ecCount = totalCount - dataCount;
+
+          var rsPoly = getErrorCorrectPolynomial(ecCount);
+          var rawData = buffer.buffer;
+
+          var dcData = [];
+          var ecData = [];
+
+          for (var r = 0; r < blockCount; r++) {
+            var dc = [];
+            for (var i = 0; i < dataCount; i++) {
+              dc.push(rawData[r * dataCount + i] || 0);
+            }
+            dcData.push(dc);
+
+            var modPoly = new Poly(dc, ecCount).mod(rsPoly);
+            var ec = new Array(ecCount);
+            for (var i = 0; i < ecCount; i++) {
+              var modIndex = i + modPoly.getLength() - ecCount;
+              ec[i] = (modIndex >= 0) ? modPoly.get(modIndex) : 0;
+            }
+            ecData.push(ec);
+          }
+
+          var totalCode = [];
+          for (var i = 0; i < dataCount; i++) {
+            for (var r = 0; r < blockCount; r++) {
+              totalCode.push(dcData[r][i]);
+            }
+          }
+          for (var i = 0; i < ecCount; i++) {
+            for (var r = 0; r < blockCount; r++) {
+              totalCode.push(ecData[r][i]);
+            }
+          }
+          return totalCode;
+        }
+
+        var FORMAT_INFO_MASK0 = 0x77c4;
+
+        function generateMatrix(text) {
+          var byteLen = text.length;
+          var ver = 1;
+          for (var v = 1; v <= RS_BLOCK_TABLE.length; v++) {
+            var cap = (RS_BLOCK_TABLE[v - 1][0] * RS_BLOCK_TABLE[v - 1][2]) - 3;
+            if (byteLen <= cap) {
+              ver = v;
+              break;
+            }
+          }
+          var modCount = ver * 4 + 17;
+          var modules = [];
+          var isFunction = [];
+          for (var r = 0; r < modCount; r++) {
+            modules[r] = new Array(modCount);
+            isFunction[r] = new Array(modCount);
+            for (var c = 0; c < modCount; c++) {
+              modules[r][c] = false;
+              isFunction[r][c] = false;
+            }
+          }
+
+          function setupPositionProbe(row, col) {
+            for (var r = -1; r <= 7; r++) {
+              var cr = row + r;
+              if (cr < 0 || cr >= modCount) continue;
+              for (var c = -1; c <= 7; c++) {
+                var cc = col + c;
+                if (cc < 0 || cc >= modCount) continue;
+                if ((0 <= r && r <= 6 && (c === 0 || c === 6)) ||
+                    (0 <= c && c <= 6 && (r === 0 || r === 6)) ||
+                    (2 <= r && r <= 4 && 2 <= c && c <= 4)) {
+                  modules[cr][cc] = true;
+                } else {
+                  modules[cr][cc] = false;
+                }
+                isFunction[cr][cc] = true;
+              }
+            }
+          }
+
+          setupPositionProbe(0, 0);
+          setupPositionProbe(modCount - 7, 0);
+          setupPositionProbe(0, modCount - 7);
+
+          for (var i = 8; i < modCount - 8; i++) {
+            if (!isFunction[i][6]) {
+              modules[i][6] = (i % 2 === 0);
+              isFunction[i][6] = true;
+            }
+            if (!isFunction[6][i]) {
+              modules[6][i] = (i % 2 === 0);
+              isFunction[6][i] = true;
+            }
+          }
+
+          var pos = ALIGN_PATTERNS[ver - 1];
+          for (var i = 0; i < pos.length; i++) {
+            for (var j = 0; j < pos.length; j++) {
+              var row = pos[i];
+              var col = pos[j];
+              if (isFunction[row][col]) continue;
+              for (var r = -2; r <= 2; r++) {
+                for (var c = -2; c <= 2; c++) {
+                  modules[row + r][col + c] = (r === -2 || r === 2 || c === -2 || c === 2 || (r === 0 && c === 0));
+                  isFunction[row + r][col + c] = true;
+                }
+              }
+            }
+          }
+
+          var pos1 = [
+            [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8],
+            [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]
+          ];
+          var pos2 = [
+            [8, modCount - 1], [8, modCount - 2], [8, modCount - 3], [8, modCount - 4],
+            [8, modCount - 5], [8, modCount - 6], [8, modCount - 7], [8, modCount - 8],
+            [modCount - 7, 8], [modCount - 6, 8], [modCount - 5, 8], [modCount - 4, 8],
+            [modCount - 3, 8], [modCount - 2, 8], [modCount - 1, 8]
+          ];
+
+          for (var i = 0; i < 15; i++) {
+            isFunction[pos1[i][0]][pos1[i][1]] = true;
+            isFunction[pos2[i][0]][pos2[i][1]] = true;
+          }
+
+          modules[4 * ver + 9][8] = true;
+          isFunction[4 * ver + 9][8] = true;
+
+          var data = createData(ver, text);
+          var bitIndex = 0;
+          var byteIndex = 0;
+          var inc = -1;
+          var row = modCount - 1;
+
+          for (var col = modCount - 1; col > 0; col -= 2) {
+            if (col === 6) col--;
+            while (true) {
+              for (var c = 0; c < 2; c++) {
+                var colIdx = col - c;
+                if (!isFunction[row][colIdx]) {
+                  var dark = false;
+                  if (byteIndex < data.length) {
+                    dark = (((data[byteIndex] >>> (7 - bitIndex)) & 1) === 1);
+                  }
+                  var mask = ((row + colIdx) % 2 === 0);
+                  modules[row][colIdx] = dark ^ mask;
+                  bitIndex++;
+                  if (bitIndex === 8) {
+                    bitIndex = 0;
+                    byteIndex++;
+                  }
+                }
+              }
+              row += inc;
+              if (row < 0 || modCount <= row) {
+                row -= inc;
+                inc = -inc;
+                break;
+              }
+            }
+          }
+
+          var formatBits = FORMAT_INFO_MASK0;
+          for (var i = 0; i < 15; i++) {
+            var bit = ((formatBits >>> i) & 1) === 1;
+            modules[pos1[i][0]][pos1[i][1]] = bit;
+            modules[pos2[i][0]][pos2[i][1]] = bit;
+          }
+
+          return { size: modCount, modules: modules };
+        }
+
+        function toSVG(text, size) {
+          var qr = generateMatrix(text);
+          var modCount = qr.size;
+          var margin = 2;
+          var totalCells = modCount + margin * 2;
+          var cellSize = size / totalCells;
+          var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '" style="display:block;margin:0 auto;border-radius:4px;" aria-label="QR Code para entrar no modo controle">';
+          svg += '<rect width="' + size + '" height="' + size + '" fill="#FFFFFF"/>';
+          for (var r = 0; r < modCount; r++) {
+            for (var c = 0; c < modCount; c++) {
+              if (qr.modules[r][c]) {
+                var x = (c + margin) * cellSize;
+                var y = (r + margin) * cellSize;
+                svg += '<rect x="' + x.toFixed(2) + '" y="' + y.toFixed(2) + '" width="' + (cellSize + 0.05).toFixed(2) + '" height="' + (cellSize + 0.05).toFixed(2) + '" fill="#1A365D"/>';
+              }
+            }
+          }
+          svg += '</svg>';
+          return svg;
+        }
+
+        return { toSVG: toSVG };
+      } catch (e) {
+        console.warn('MiniQR initialization failed:', e);
+        return null;
+      }
+    })();
+
+    // Helper com isolamento estrito para renderizar o QR code do palco
+    var lastPalcoQrUrl = "";
+    function renderPalcoQR() {
+      try {
+        var card = document.getElementById('palco-qr-card');
+        var renderEl = document.getElementById('palco-qr-render');
+        if (!card || !renderEl) return;
+
+        var base = (window.location.href || '').split('?')[0].split('#')[0];
+        var targetUrl = base + '?modo=controle';
+
+        // Evita reprocessamento se URL idêntica e já renderizado
+        if (targetUrl === lastPalcoQrUrl && renderEl.hasChildNodes()) {
+          return;
+        }
+        lastPalcoQrUrl = targetUrl;
+
+        if (MiniQR && typeof MiniQR.toSVG === 'function') {
+          var svgHtml = MiniQR.toSVG(targetUrl, 170);
+          if (svgHtml) {
+            renderEl.innerHTML = svgHtml;
+            card.style.display = 'flex';
+            return;
+          }
+        }
+        // Se algo falhar dentro da geração, oculta o card com segurança
+        card.style.display = 'none';
+      } catch (err) {
+        console.warn('Falha segura na renderização do QR Code:', err);
+        try {
+          var c = document.getElementById('palco-qr-card');
+          if (c) c.style.display = 'none';
+        } catch(e) {}
+      }
+    }
+
+    // ==========================================
+    // 2. CATÁLOGO INICIAL COM 50 LOUVORES
+    // ====================================================================================
+    // 2. CATÁLOGO INICIAL COM 50 LOUVORES
+    // ==========================================
+    var DEFAULT_CATALOG = [
+=======
+        // Se abrir o palco, atualiza QR e URL se estiver sob HTTP
         if (screenId === 'palco') {
-          initQRCode();
+          updateQrIfHttp();
         }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1244,6 +2116,79 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
     }
 
     // ==========================================
+    // ENTRADA DIRETA PELO PARÂMETRO (?modo=controle)
+    // ==========================================
+    try {
+      var urlSearch = window.location.search || '';
+      if (urlSearch.indexOf('modo=controle') !== -1) {
+        showScreen('controle');
+      }
+    } catch (eParam) {
+      console.warn('Erro ao processar parâmetro de URL:', eParam);
+    }
+
+    // Helper toast simples
+    function showToast(msg) {
+      try {
+        var toast = document.getElementById('app-toast');
+        if (toast) {
+          toast.textContent = msg;
+          toast.style.display = 'block';
+          setTimeout(function() {
+            toast.style.display = 'none';
+          }, 3000);
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    // Fallback de imagens com falha
+    function setupImageFallbacks() {
+      try {
+        var imgs = document.querySelectorAll('img.mascot-avatar');
+        imgs.forEach(function(img) {
+          img.onerror = function() {
+            this.onerror = null;
+            this.src = "https://img.usecurling.com/i?q=music-note&color=yellow&shape=fill";
+          };
+        });
+      } catch (e) {
+        console.warn('Erro ao configurar fallbacks:', e);
+      }
+    }
+
+    // ==========================================
+    // ATUALIZAÇÃO OPCIONAL DINÂMICA DO QR CODE (HTTP APENAS)
+    // Se falhar ou estiver offline, o QR fixo do HTML prevalece
+    // ==========================================
+    function updateQrIfHttp() {
+      try {
+        if (location.href && location.href.indexOf('http') === 0) {
+          var realBase = location.href.split('?')[0].split('#')[0];
+          var realTarget = realBase + '?modo=controle';
+          var qrImg = document.getElementById('qr-img');
+          if (qrImg) {
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(realTarget);
+          }
+          var directUrlEl = document.getElementById('palco-direct-url');
+          if (directUrlEl) {
+            directUrlEl.textContent = realTarget.replace(/^https?:\/\//, '');
+          }
+          var manualInput = document.getElementById('manual-copy-input');
+          if (manualInput) {
+            manualInput.value = realTarget;
+          }
+        }
+      } catch (eQr) {
+        console.warn('Atualização dinâmica do QR ignorada (mantendo o do HTML):', eQr);
+      }
+    }
+
+    // ==========================================
+    // 2. CATÁLOGO INICIAL COM 50 LOUVORES
+    // ==========================================
+    var DEFAULT_CATALOG = [==========================================
     // ENTRADA DIRETA PELO PARÂMETRO (?modo=controle)
     // ==========================================
     try {
@@ -2704,11 +3649,11 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
       }
 
       // 4. Renderizar Catálogo e Fila
-      // 3.5 Inicializar QR code do palco
+      // 3.5 Atualização opcional do QR Code se URL for http
       try {
-        initQRCode();
+        updateQrIfHttp();
       } catch (e) {
-        console.warn('Erro ao inicializar QR Code:', e);
+        console.warn('Erro ao atualizar QR Code:', e);
       }
 
       try {
@@ -2782,6 +3727,70 @@ table.shell-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 
           btnHeroCtrl.addEventListener('click', function() { showScreen('controle'); });
         }
       } catch (e) {}
+
+      // Botão Copiar Link do Convite (Alternativa sem QR)
+      try {
+        var btnCopyLink = document.getElementById('btn-copy-invite-link');
+        if (btnCopyLink) {
+          btnCopyLink.addEventListener('click', function() {
+            var inviteUrl = 'https://pglsjkbr.github.io/new-karaoque/?modo=controle';
+            try {
+              if (location.href && location.href.indexOf('http') === 0) {
+                var cleanBase = location.href.split('?')[0].split('#')[0];
+                inviteUrl = cleanBase + '?modo=controle';
+              }
+            } catch (_) {}
+
+            function onCopySuccess() {
+              btnCopyLink.textContent = '✅ Link copiado!';
+              showToast('Link do Modo Controle copiado!');
+              setTimeout(function() {
+                btnCopyLink.innerHTML = '📋 Copiar link do convite';
+              }, 3000);
+            }
+
+            function fallbackCopy() {
+              try {
+                var tempTextArea = document.createElement('textarea');
+                tempTextArea.value = inviteUrl;
+                tempTextArea.style.position = 'fixed';
+                tempTextArea.style.left = '-9999px';
+                tempTextArea.style.top = '0';
+                document.body.appendChild(tempTextArea);
+                tempTextArea.focus();
+                tempTextArea.select();
+                var successful = document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+                if (successful) {
+                  onCopySuccess();
+                } else {
+                  throw new Error('execCommand copy failed');
+                }
+              } catch (errFallback) {
+                console.warn('Fallback copy failed:', errFallback);
+                var manualInput = document.getElementById('manual-copy-input');
+                if (manualInput) {
+                  manualInput.style.display = 'block';
+                  manualInput.value = inviteUrl;
+                  manualInput.focus();
+                  manualInput.select();
+                }
+                showToast('Copie o link manualmente no campo abaixo');
+              }
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(inviteUrl).then(onCopySuccess).catch(function() {
+                fallbackCopy();
+              });
+            } else {
+              fallbackCopy();
+            }
+          });
+        }
+      } catch (eCopy) {
+        console.warn('Erro ao configurar botão de copiar convite:', eCopy);
+      }
 
       // Controles do Palco (TV)
       try {
